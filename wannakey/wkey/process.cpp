@@ -107,5 +107,60 @@ std::string getProcessPath(MapFilesPID const& Procs, uint32_t Pid)
   return std::string{};
 }
 
+std::error_code walkProcessMemory(uint32_t PID, ValidCb const& CbValid, MemoryCb const& Cb)
+{
+  HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, PID);
+  if (hProc == NULL) {
+    return getLastEC();
+  }
+
+  MEMORY_BASIC_INFORMATION MemInfo;
+
+  // Search for primes of subkeyLen bits, and check if they factor N!
+  
+  std::vector<uint8_t> Buf;
+  SYSTEM_INFO SI;
+  GetSystemInfo(&SI);
+  uint8_t* CurAddr = (uint8_t*) SI.lpMinimumApplicationAddress;
+  const size_t PageSize = SI.dwPageSize;
+  while ((uintptr_t)CurAddr < (uintptr_t)SI.lpMaximumApplicationAddress) {
+    if (!VirtualQueryEx(hProc, CurAddr, &MemInfo, sizeof(MEMORY_BASIC_INFORMATION))) {
+      CurAddr += PageSize;
+      continue;
+    }
+    CurAddr += MemInfo.RegionSize;
+
+    if (!CbValid(MemInfo)) {
+      continue;
+    }
+
+    const size_t Size = MemInfo.RegionSize;
+    SIZE_T ReadSize;
+    Buf.resize(Size);
+	printf("%x %d\n", MemInfo.BaseAddress, Size);
+    if (!ReadProcessMemory(hProc, MemInfo.BaseAddress, &Buf[0], Size, &ReadSize)) {
+      return getLastEC();
+    }
+    if (ReadSize != Size) {
+      std::cerr << "Warninng: ReadProcessMemory returned only " << ReadSize << " bytes when asked for " << Size << std::endl;
+    }
+
+    if (!Cb(&Buf[0], ReadSize)) {
+      break;
+    }
+  }
+
+  return std::error_code{};
+}
+
+std::error_code walkProcessPrivateRWMemory(uint32_t PID, MemoryCb const& Cb)
+{
+  return walkProcessMemory(PID,
+    [] (MEMORY_BASIC_INFORMATION const& MemInfo) {
+      return (MemInfo.Type == MEM_PRIVATE && MemInfo.State != MEM_RESERVE && (MemInfo.Protect == PAGE_READWRITE || MemInfo.Protect == PAGE_READONLY));
+    },
+    Cb);
+}
+
 
 } // wcry

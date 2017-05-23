@@ -83,7 +83,7 @@ std::error_code getLastEC()
 }
 
 // From http://stackoverflow.com/questions/2188914/c-searching-for-a-string-in-a-file
-static void *memmem(const uint8_t *haystack, size_t hlen, const uint8_t *needle, size_t nlen)
+void *memmem(const uint8_t *haystack, size_t hlen, const uint8_t *needle, size_t nlen)
 {
   int needle_first;
   const uint8_t *p = haystack;

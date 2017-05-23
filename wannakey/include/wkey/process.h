@@ -17,9 +17,12 @@
 #ifndef WKEY_PROCESS_H
 #define WKEY_PROCESS_H
 
+#include <Windows.h>
+
 #include <string>
 #include <cstdint>
 #include <map>
+#include <functional>
 
 #include <wkey/filesystem.h>
 
@@ -31,10 +34,15 @@ struct ProcInfo {
 };
 
 typedef std::map<FileID, ProcInfo> MapFilesPID;
+typedef std::function<bool(MEMORY_BASIC_INFORMATION const&)> ValidCb;
+typedef std::function<bool(uint8_t const* Buf, const size_t Data)> MemoryCb;
 
 MapFilesPID getProcessList();
 uint32_t getPIDByPath(MapFilesPID const& PIDs, const char* Path);
 std::string getProcessPath(MapFilesPID const& Procs, uint32_t Pid);
+
+std::error_code walkProcessMemory(uint32_t PID, MemoryCb const& Cb);
+std::error_code walkProcessPrivateRWMemory(uint32_t PID, MemoryCb const& Cb);
 
 } // wkey
 
